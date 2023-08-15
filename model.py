@@ -95,10 +95,14 @@ class DualNet(object):
 
     def load_random_samples(self):
         #np.random.choice(
-        sample_files =np.random.choice(glob('./datasets/{}/val/A/*.jpg'.format(self.dataset_name)),self.batch_size)
+        sample_files = np.random.choice(
+            glob(f'./datasets/{self.dataset_name}/val/A/*.jpg'), self.batch_size
+        )
         sample_A_imgs = [load_data(f, image_size =self.image_size, flip = False) for f in sample_files]
-        
-        sample_files = np.random.choice(glob('./datasets/{}/val/B/*.jpg'.format(self.dataset_name)),self.batch_size)
+
+        sample_files = np.random.choice(
+            glob(f'./datasets/{self.dataset_name}/val/B/*.jpg'), self.batch_size
+        )
         sample_B_imgs = [load_data(f, image_size =self.image_size, flip = False) for f in sample_files]
 
         sample_A_imgs = np.reshape(np.array(sample_A_imgs).astype(np.float32),(self.batch_size,self.image_size, self.image_size,-1))
@@ -123,13 +127,13 @@ class DualNet(object):
         """Train Dual GAN"""
         decay = 0.9
         self.d_optim = tf.train.RMSPropOptimizer(args.lr, decay=decay) \
-                          .minimize(self.d_loss, var_list=self.d_vars)
-                          
+                              .minimize(self.d_loss, var_list=self.d_vars)
+
         self.g_optim = tf.train.RMSPropOptimizer(args.lr, decay=decay) \
-                          .minimize(self.g_loss, var_list=self.g_vars)          
+                              .minimize(self.g_loss, var_list=self.g_vars)
         tf.global_variables_initializer().run()
 
-        self.writer = tf.summary.FileWriter("./logs/"+self.dir_name, self.sess.graph)
+        self.writer = tf.summary.FileWriter(f"./logs/{self.dir_name}", self.sess.graph)
 
         step = 1
         start_time = time.time()
@@ -141,8 +145,8 @@ class DualNet(object):
             print(" start training...")
 
         for epoch_idx in xrange(args.epoch):
-            data_A = glob('./datasets/{}/train/A/*.jpg'.format(self.dataset_name))
-            data_B = glob('./datasets/{}/train/B/*.jpg'.format(self.dataset_name))
+            data_A = glob(f'./datasets/{self.dataset_name}/train/A/*.jpg')
+            data_B = glob(f'./datasets/{self.dataset_name}/train/B/*.jpg')
             np.random.shuffle(data_A)
             np.random.shuffle(data_B)
             epoch_size = min(len(data_A), len(data_B)) // (self.batch_size)
@@ -153,7 +157,7 @@ class DualNet(object):
             for batch_idx in xrange(0, epoch_size):
                 imgA_batch = self.load_training_imgs(data_A, batch_idx)
                 imgB_batch = self.load_training_imgs(data_B, batch_idx)
-                
+
                 print("Epoch: [%2d] [%4d/%4d]"%(epoch_idx, batch_idx, epoch_size))
                 step = step + 1
                 self.run_optim(imgA_batch, imgB_batch, step, start_time)
@@ -202,16 +206,31 @@ class DualNet(object):
             else:
                 assert scope.reuse == False
 
-            h0 = lrelu(conv2d(image, self.df_dim, name=prefix+'h0_conv'))
+            h0 = lrelu(conv2d(image, self.df_dim, name=f'{prefix}h0_conv'))
             # h0 is (128 x 128 x self.df_dim)
-            h1 = lrelu(batch_norm(conv2d(h0, self.df_dim*2, name=prefix+'h1_conv'), name = prefix+'bn1'))
+            h1 = lrelu(
+                batch_norm(
+                    conv2d(h0, self.df_dim * 2, name=f'{prefix}h1_conv'),
+                    name=f'{prefix}bn1',
+                )
+            )
             # h1 is (64 x 64 x self.df_dim*2)
-            h2 = lrelu(batch_norm(conv2d(h1, self.df_dim*4, name=prefix+'h2_conv'), name = prefix+ 'bn2'))
+            h2 = lrelu(
+                batch_norm(
+                    conv2d(h1, self.df_dim * 4, name=f'{prefix}h2_conv'),
+                    name=f'{prefix}bn2',
+                )
+            )
             # h2 is (32x 32 x self.df_dim*4)
-            h3 = lrelu(batch_norm(conv2d(h2, self.df_dim*8, d_h=1, d_w=1, name=prefix+'h3_conv'), name = prefix+ 'bn3'))
-            # h3 is (32 x 32 x self.df_dim*8)
-            h4 = conv2d(h3, 1, d_h=1, d_w=1, name =prefix+'h4')
-            return h4
+            h3 = lrelu(
+                batch_norm(
+                    conv2d(
+                        h2, self.df_dim * 8, d_h=1, d_w=1, name=f'{prefix}h3_conv'
+                    ),
+                    name=f'{prefix}bn3',
+                )
+            )
+            return conv2d(h3, 1, d_h=1, d_w=1, name=f'{prefix}h4')
         
     def A_g_net(self, imgs, reuse=False):
         return self.fcn(imgs, prefix='A_g_', reuse = reuse)
@@ -226,78 +245,150 @@ class DualNet(object):
                 scope.reuse_variables()
             else:
                 assert scope.reuse == False
-            
+
             s = self.image_size
             s2, s4, s8, s16, s32, s64, s128 = int(s/2), int(s/4), int(s/8), int(s/16), int(s/32), int(s/64), int(s/128)
 
             # imgs is (256 x 256 x input_c_dim)
-            e1 = conv2d(imgs, self.fcn_filter_dim, name=prefix+'e1_conv')
+            e1 = conv2d(imgs, self.fcn_filter_dim, name=f'{prefix}e1_conv')
             # e1 is (128 x 128 x self.fcn_filter_dim)
-            e2 = batch_norm(conv2d(lrelu(e1), self.fcn_filter_dim*2, name=prefix+'e2_conv'), name = prefix+'bn_e2')
+            e2 = batch_norm(
+                conv2d(
+                    lrelu(e1), self.fcn_filter_dim * 2, name=f'{prefix}e2_conv'
+                ),
+                name=f'{prefix}bn_e2',
+            )
             # e2 is (64 x 64 x self.fcn_filter_dim*2)
-            e3 = batch_norm(conv2d(lrelu(e2), self.fcn_filter_dim*4, name=prefix+'e3_conv'), name = prefix+'bn_e3')
+            e3 = batch_norm(
+                conv2d(
+                    lrelu(e2), self.fcn_filter_dim * 4, name=f'{prefix}e3_conv'
+                ),
+                name=f'{prefix}bn_e3',
+            )
             # e3 is (32 x 32 x self.fcn_filter_dim*4)
-            e4 = batch_norm(conv2d(lrelu(e3), self.fcn_filter_dim*8, name=prefix+'e4_conv'), name = prefix+'bn_e4')
+            e4 = batch_norm(
+                conv2d(
+                    lrelu(e3), self.fcn_filter_dim * 8, name=f'{prefix}e4_conv'
+                ),
+                name=f'{prefix}bn_e4',
+            )
             # e4 is (16 x 16 x self.fcn_filter_dim*8)
-            e5 = batch_norm(conv2d(lrelu(e4), self.fcn_filter_dim*8, name=prefix+'e5_conv'), name = prefix+'bn_e5')
+            e5 = batch_norm(
+                conv2d(
+                    lrelu(e4), self.fcn_filter_dim * 8, name=f'{prefix}e5_conv'
+                ),
+                name=f'{prefix}bn_e5',
+            )
             # e5 is (8 x 8 x self.fcn_filter_dim*8)
-            e6 = batch_norm(conv2d(lrelu(e5), self.fcn_filter_dim*8, name=prefix+'e6_conv'), name = prefix+'bn_e6')
+            e6 = batch_norm(
+                conv2d(
+                    lrelu(e5), self.fcn_filter_dim * 8, name=f'{prefix}e6_conv'
+                ),
+                name=f'{prefix}bn_e6',
+            )
             # e6 is (4 x 4 x self.fcn_filter_dim*8)
-            e7 = batch_norm(conv2d(lrelu(e6), self.fcn_filter_dim*8, name=prefix+'e7_conv'), name = prefix+'bn_e7')
+            e7 = batch_norm(
+                conv2d(
+                    lrelu(e6), self.fcn_filter_dim * 8, name=f'{prefix}e7_conv'
+                ),
+                name=f'{prefix}bn_e7',
+            )
             # e7 is (2 x 2 x self.fcn_filter_dim*8)
-            e8 = batch_norm(conv2d(lrelu(e7), self.fcn_filter_dim*8, name=prefix+'e8_conv'), name = prefix+'bn_e8')
+            e8 = batch_norm(
+                conv2d(
+                    lrelu(e7), self.fcn_filter_dim * 8, name=f'{prefix}e8_conv'
+                ),
+                name=f'{prefix}bn_e8',
+            )
             # e8 is (1 x 1 x self.fcn_filter_dim*8)
 
-            self.d1, self.d1_w, self.d1_b = deconv2d(tf.nn.relu(e8),
-                [self.batch_size, s128, s128, self.fcn_filter_dim*8], name=prefix+'d1', with_w=True)
-            d1 = tf.nn.dropout(batch_norm(self.d1, name = prefix+'bn_d1'), 0.5)
+            self.d1, self.d1_w, self.d1_b = deconv2d(
+                tf.nn.relu(e8),
+                [self.batch_size, s128, s128, self.fcn_filter_dim * 8],
+                name=f'{prefix}d1',
+                with_w=True,
+            )
+            d1 = tf.nn.dropout(batch_norm(self.d1, name=f'{prefix}bn_d1'), 0.5)
             d1 = tf.concat([d1, e7],3)
             # d1 is (2 x 2 x self.fcn_filter_dim*8*2)
 
-            self.d2, self.d2_w, self.d2_b = deconv2d(tf.nn.relu(d1),
-                [self.batch_size, s64, s64, self.fcn_filter_dim*8], name=prefix+'d2', with_w=True)
-            d2 = tf.nn.dropout(batch_norm(self.d2, name = prefix+'bn_d2'), 0.5)
+            self.d2, self.d2_w, self.d2_b = deconv2d(
+                tf.nn.relu(d1),
+                [self.batch_size, s64, s64, self.fcn_filter_dim * 8],
+                name=f'{prefix}d2',
+                with_w=True,
+            )
+            d2 = tf.nn.dropout(batch_norm(self.d2, name=f'{prefix}bn_d2'), 0.5)
 
             d2 = tf.concat([d2, e6],3)
             # d2 is (4 x 4 x self.fcn_filter_dim*8*2)
 
-            self.d3, self.d3_w, self.d3_b = deconv2d(tf.nn.relu(d2),
-                [self.batch_size, s32, s32, self.fcn_filter_dim*8], name=prefix+'d3', with_w=True)
-            d3 = tf.nn.dropout(batch_norm(self.d3, name = prefix+'bn_d3'), 0.5)
+            self.d3, self.d3_w, self.d3_b = deconv2d(
+                tf.nn.relu(d2),
+                [self.batch_size, s32, s32, self.fcn_filter_dim * 8],
+                name=f'{prefix}d3',
+                with_w=True,
+            )
+            d3 = tf.nn.dropout(batch_norm(self.d3, name=f'{prefix}bn_d3'), 0.5)
 
             d3 = tf.concat([d3, e5],3)
             # d3 is (8 x 8 x self.fcn_filter_dim*8*2)
 
-            self.d4, self.d4_w, self.d4_b = deconv2d(tf.nn.relu(d3),
-                [self.batch_size, s16, s16, self.fcn_filter_dim*8], name=prefix+'d4', with_w=True)
-            d4 = batch_norm(self.d4, name = prefix+'bn_d4')
+            self.d4, self.d4_w, self.d4_b = deconv2d(
+                tf.nn.relu(d3),
+                [self.batch_size, s16, s16, self.fcn_filter_dim * 8],
+                name=f'{prefix}d4',
+                with_w=True,
+            )
+            d4 = batch_norm(self.d4, name=f'{prefix}bn_d4')
 
             d4 = tf.concat([d4, e4],3)
             # d4 is (16 x 16 x self.fcn_filter_dim*8*2)
 
-            self.d5, self.d5_w, self.d5_b = deconv2d(tf.nn.relu(d4),
-                [self.batch_size, s8, s8, self.fcn_filter_dim*4], name=prefix+'d5', with_w=True)
-            d5 = batch_norm(self.d5, name = prefix+'bn_d5')
+            self.d5, self.d5_w, self.d5_b = deconv2d(
+                tf.nn.relu(d4),
+                [self.batch_size, s8, s8, self.fcn_filter_dim * 4],
+                name=f'{prefix}d5',
+                with_w=True,
+            )
+            d5 = batch_norm(self.d5, name=f'{prefix}bn_d5')
             d5 = tf.concat([d5, e3],3)
             # d5 is (32 x 32 x self.fcn_filter_dim*4*2)
 
-            self.d6, self.d6_w, self.d6_b = deconv2d(tf.nn.relu(d5),
-                [self.batch_size, s4, s4, self.fcn_filter_dim*2], name=prefix+'d6', with_w=True)
-            d6 = batch_norm(self.d6, name = prefix+'bn_d6')
+            self.d6, self.d6_w, self.d6_b = deconv2d(
+                tf.nn.relu(d5),
+                [self.batch_size, s4, s4, self.fcn_filter_dim * 2],
+                name=f'{prefix}d6',
+                with_w=True,
+            )
+            d6 = batch_norm(self.d6, name=f'{prefix}bn_d6')
             d6 = tf.concat([d6, e2],3)
             # d6 is (64 x 64 x self.fcn_filter_dim*2*2)
 
-            self.d7, self.d7_w, self.d7_b = deconv2d(tf.nn.relu(d6),
-                [self.batch_size, s2, s2, self.fcn_filter_dim], name=prefix+'d7', with_w=True)
-            d7 = batch_norm(self.d7, name = prefix+'bn_d7')
+            self.d7, self.d7_w, self.d7_b = deconv2d(
+                tf.nn.relu(d6),
+                [self.batch_size, s2, s2, self.fcn_filter_dim],
+                name=f'{prefix}d7',
+                with_w=True,
+            )
+            d7 = batch_norm(self.d7, name=f'{prefix}bn_d7')
             d7 = tf.concat([d7, e1],3)
             # d7 is (128 x 128 x self.fcn_filter_dim*1*2)
 
             if prefix == 'B_g_':
-                self.d8, self.d8_w, self.d8_b = deconv2d(tf.nn.relu(d7),[self.batch_size, s, s, self.A_channels], name=prefix+'d8', with_w=True)
+                self.d8, self.d8_w, self.d8_b = deconv2d(
+                    tf.nn.relu(d7),
+                    [self.batch_size, s, s, self.A_channels],
+                    name=f'{prefix}d8',
+                    with_w=True,
+                )
             elif prefix == 'A_g_':
-                self.d8, self.d8_w, self.d8_b = deconv2d(tf.nn.relu(d7),[self.batch_size, s, s, self.B_channels], name=prefix+'d8', with_w=True)
-             # d8 is (256 x 256 x output_c_dim)
+                self.d8, self.d8_w, self.d8_b = deconv2d(
+                    tf.nn.relu(d7),
+                    [self.batch_size, s, s, self.B_channels],
+                    name=f'{prefix}d8',
+                    with_w=True,
+                )
             return tf.nn.tanh(self.d8)
     
     def save(self, checkpoint_dir, step):
@@ -332,17 +423,16 @@ class DualNet(object):
         tf.global_variables_initializer().run()
         if self.load(self.checkpoint_dir):
             print(" [*] Load SUCCESS")
-            test_dir = './{}/{}'.format(args.test_dir, self.dir_name)
+            test_dir = f'./{args.test_dir}/{self.dir_name}'
             if not os.path.exists(test_dir):
                 os.makedirs(test_dir)
-            test_log = open(test_dir+'evaluation.txt','a') 
-            test_log.write(self.dir_name)
-            self.test_domain(args, test_log, type = 'A')
-            self.test_domain(args, test_log, type = 'B')
-            test_log.close()
+            with open(f'{test_dir}evaluation.txt', 'a') as test_log:
+                test_log.write(self.dir_name)
+                self.test_domain(args, test_log, type = 'A')
+                self.test_domain(args, test_log, type = 'B')
         
     def test_domain(self, args, test_log, type = 'A'):
-        test_files = glob('./datasets/{}/val/{}/*.jpg'.format(self.dataset_name,type))
+        test_files = glob(f'./datasets/{self.dataset_name}/val/{type}/*.jpg')
         # load testing input
         print("Loading testing images ...")
         test_imgs = [load_data(f, is_test=True, image_size =self.image_size, flip = args.flip) for f in test_files]
@@ -351,7 +441,7 @@ class DualNet(object):
         test_imgs = [test_imgs[i*self.batch_size:(i+1)*self.batch_size]
                          for i in xrange(0, len(test_imgs)//self.batch_size)]
         test_imgs = np.asarray(test_imgs)
-        test_path = './{}/{}/'.format(args.test_dir, self.dir_name)
+        test_path = f'./{args.test_dir}/{self.dir_name}/'
         # test input samples
         if type == 'A':
             for i in xrange(0, len(test_files)//self.batch_size):

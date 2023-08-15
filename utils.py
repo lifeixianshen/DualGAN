@@ -26,8 +26,7 @@ def load_data(image_path, flip=False, is_test=False, image_size = 128):
     return img
 
 def load_image(image_path):
-    img = imread(image_path)
-    return img
+    return imread(image_path)
 
 def preprocess_img(img, img_size=128, flip=False, is_test=False):
     img = scipy.misc.imresize(img, [img_size, img_size])

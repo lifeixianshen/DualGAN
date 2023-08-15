@@ -14,8 +14,7 @@ def batch_norm(x,  name="batch_norm"):
         center = tf.get_variable("center", [nchannels], initializer=tf.constant_initializer(0.0, dtype = tf.float32))
         ave, dev = tf.nn.moments(x, axes=[1,2], keep_dims=True)
         inv_dev = tf.rsqrt(dev + eps)
-        normalized = (x-ave)*inv_dev * scale + center
-        return normalized
+        return (x-ave)*inv_dev * scale + center
 
 def conv2d(input_, output_dim, 
            k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02,
@@ -49,10 +48,7 @@ def deconv2d(input_, output_shape,
         biases = tf.get_variable('biases', [output_shape[-1]], initializer=tf.constant_initializer(0.0))
         deconv = tf.reshape(tf.nn.bias_add(deconv, biases), deconv.get_shape())
 
-        if with_w:
-            return deconv, w, biases
-        else:
-            return deconv
+        return (deconv, w, biases) if with_w else deconv
        
 def lrelu(x, leak=0.2, name="lrelu"):
   return tf.maximum(x, leak*x)
